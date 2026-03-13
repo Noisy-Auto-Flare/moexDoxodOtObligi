@@ -21,9 +21,13 @@ class BondMarketData(BaseModel):
     boardid: str = Field(alias="BOARDID")
     shortname: Optional[str] = Field(None, alias="SHORTNAME")
     price: Optional[float] = Field(None, alias="PREVPRICE")
-    accruedint: float = Field(default=0.0, alias="ACCRUEDINT")
+    accruedint: Optional[float] = Field(None, alias="ACCRUEDINT")
+    bid: Optional[float] = Field(None, alias="BID")
+    offer: Optional[float] = Field(None, alias="OFFER")
     couponvalue: Optional[float] = Field(None, alias="COUPONVALUE")
     couponpercent: Optional[float] = Field(None, alias="COUPONPERCENT")
+    nextcoupon: Optional[date] = Field(None, alias="NEXTCOUPON")
+    prevdate: Optional[date] = Field(None, alias="PREVDATE")
     matdate: Optional[date] = Field(None, alias="MATDATE")
     offerdate: Optional[date] = Field(None, alias="OFFERDATE")
     buybackdate: Optional[date] = Field(None, alias="BUYBACKDATE")
@@ -85,6 +89,8 @@ class CalculationResult(BaseModel):
     """Результат расчёта доходности."""
     secid: str
     ytm_percent: Optional[float] = None
+    ytm_bid_percent: Optional[float] = None
+    ytm_offer_percent: Optional[float] = None
     dirty_price: float
     accrued_interest: float
     cashflows: List[CashFlow] = []

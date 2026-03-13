@@ -47,9 +47,9 @@ class DataFetcher:
         return self._get(url, {})
 
     def get_market_data(self, secid: str, board: str) -> List[Dict[str, Any]]:
-        """Получает рыночные данные по бумаге на конкретном режиме торгов."""
+        """Получает рыночные данные (securities + marketdata) по бумаге."""
         url = f"{config.ISS_BASE_URL}/engines/stock/markets/bonds/boards/{board}/securities/{secid}.json"
-        return self._get(url, {"iss.only": "securities"})
+        return self._get(url, {"iss.only": "securities,marketdata"})
 
     def get_bondization(self, secid: str) -> List[Dict[str, Any]]:
         """Получает данные о купонах и амортизациях."""

@@ -28,12 +28,20 @@ def run_interactive():
     try:
         result = calc.calculate(secid=secid)
         
-        if result.ytm_percent is not None:
+        if result.ytm_percent is not None or result.ytm_bid_percent is not None or result.ytm_offer_percent is not None:
             print("\n" + "="*50)
             print(f"Результаты для {result.secid}:")
             print("-" * 50)
-            print(f"Доходность к погашению (YTM): {result.ytm_percent}% годовых")
-            print(f"Грязная цена: {result.dirty_price:.2f}")
+            
+            if result.ytm_percent is not None:
+                print(f"Доходность (Last/Prev): {result.ytm_percent}% годовых")
+            if result.ytm_bid_percent is not None:
+                print(f"Доходность (Покупка/Bid): {result.ytm_bid_percent}% годовых")
+            if result.ytm_offer_percent is not None:
+                print(f"Доходность (Продажа/Offer): {result.ytm_offer_percent}% годовых")
+                
+            print("-" * 50)
+            print(f"Грязная цена (для YTM): {result.dirty_price:.2f}")
             print(f"Накопленный купонный доход (НКД): {result.accrued_interest:.2f}")
             
             if result.warning:
