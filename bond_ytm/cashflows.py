@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import structlog
 from .models import BondMarketData, Coupon, Amortization, CashFlow
 from .config import config
@@ -21,7 +21,7 @@ class CashFlowBuilder:
         """
         flows: List[CashFlow] = []
         current_face = market_data.facevalue
-        year_basis = config.DEFAULT_YEAR_BASIS
+        year_basis = market_data.yearbasis or config.DEFAULT_YEAR_BASIS
         
         # 1. Сортируем купоны и амортизации по дате
         coupons = sorted(coupons, key=lambda x: x.coupondate)
@@ -48,12 +48,14 @@ class CashFlowBuilder:
             for a in future_amorts:
                 if a.value is None:
                     a.value = amort_per_date
+                    logger.info("amort_prorata_calculated", value=a.value, date=a.amortdate)
 
         # 3. Обработка купонной ставки (Formula 14)
         cp_percent = market_data.couponpercent
+        source = "ISS_COUPONPERCENT"
         
         # Если ставка неизвестна, но есть НКД - вычисляем по Формуле 14
-        if cp_percent is None and market_data.accruedint > 0:
+        if cp_percent is None and market_data.accruedint and market_data.accruedint > 0:
             # tc – число дней от даты начала купона до даты расчетов
             # Если prevdate нет, пробуем найти начало текущего купона
             prev_coupon_date = market_data.prevdate
@@ -65,7 +67,10 @@ class CashFlowBuilder:
                 if t_passed > 0:
                     # Cp = (A * 100 * YearBasis) / (N * t_passed)
                     cp_percent = (market_data.accruedint * 100 * year_basis) / (market_data.facevalue * t_passed)
-                    logger.info("cp_calculated_from_ai", cp=cp_percent, secid=market_data.secid)
+                    source = "CALCULATED_FROM_AI"
+                    logger.info("cp_calculated_from_ai", cp=cp_percent, t_passed=t_passed, secid=market_data.secid)
+
+        logger.info("coupon_rate_determined", cp_percent=cp_percent, source=source, year_basis=year_basis)
 
         # 4. Фильтруем будущие купоны
         future_coupons = [c for c in coupons if c.coupondate > calc_date]
@@ -117,13 +122,17 @@ class CashFlowBuilder:
                     if prev_c_date:
                         t_i = (d - prev_c_date).days
                         coupon_val = (cp_percent * current_face * t_i / year_basis) / 100
-
+                
             amort_val = a_obj.value if a_obj and a_obj.value is not None else 0.0
             
-            if (coupon_val and coupon_val > 0) or (amort_val and amort_val > 0):
+            total_val = float(coupon_val) + float(amort_val)
+            if config.ROUND_CASHFLOWS:
+                total_val = round(total_val, 2)
+            
+            if total_val > 0:
                 flows.append(CashFlow(
                     date=d,
-                    amount=float(coupon_val) + float(amort_val),
+                    amount=total_val,
                     is_coupon=coupon_val > 0 if coupon_val else False,
                     is_amortization=amort_val > 0,
                     remaining_face_value=current_face

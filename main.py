@@ -43,6 +43,9 @@ def run_interactive():
             print("-" * 50)
             print(f"Грязная цена (для YTM): {result.dirty_price:.2f}")
             print(f"Накопленный купонный доход (НКД): {result.accrued_interest:.2f}")
+            print(f"База года (YearBasis): {result.year_basis}")
+            if result.coupon_rate_calculated:
+                print(f"Ставка купона (Cp): {result.coupon_rate_calculated:.4f}%")
             
             if result.warning:
                 print(f"Предупреждение: {result.warning}")

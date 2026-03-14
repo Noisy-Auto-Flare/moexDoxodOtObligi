@@ -15,7 +15,10 @@ class AppConfig:
     
     # Пороговые значения
     MIN_YIELD: float = -100.0
-    SOLVER_TOLERANCE: float = 1e-7
+    SOLVER_TOLERANCE: float = 1e-8
+    
+    # Округление купонов (до копеек)
+    ROUND_CASHFLOWS: bool = True
     
     # Параметры для бессрочных облигаций
     PERPETUAL_YEARS_AHEAD: int = 10

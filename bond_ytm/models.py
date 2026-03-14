@@ -38,6 +38,8 @@ class BondMarketData(BaseModel):
     currencyid: str = Field(default="SUR", alias="CURRENCYID")
     status: str = Field(default="A", alias="STATUS")
     sectype: Optional[str] = Field(None, alias="SECTYPE")
+    yearbasis: Optional[int] = Field(None, alias="YEARBASIS")
+    issuesize: Optional[float] = Field(None, alias="ISSUESIZE")
 
     @field_validator("matdate", "offerdate", "buybackdate", mode="before")
     @classmethod
@@ -94,5 +96,7 @@ class CalculationResult(BaseModel):
     dirty_price: float
     accrued_interest: float
     cashflows: List[CashFlow] = []
+    year_basis: Optional[int] = None
+    coupon_rate_calculated: Optional[float] = None
     warning: Optional[str] = None
     error_reason: Optional[str] = None
