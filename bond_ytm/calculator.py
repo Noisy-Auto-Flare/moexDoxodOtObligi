@@ -10,7 +10,7 @@ from .exceptions import (
     NoMarketDataError,
     DataFetchError
 )
-from .utils import is_last_period
+from .utils import is_last_period, DayCountBasis
 
 logger = structlog.get_logger(__name__)
 
@@ -19,15 +19,16 @@ class BondYieldCalculator:
 
     def __init__(self, fetcher: Optional[DataFetcher] = None):
         self.fetcher = fetcher or DataFetcher()
-        self.solver = YTMSolver(config.DEFAULT_YEAR_BASIS)
+        self.solver = YTMSolver(config.DEFAULT_YEAR_BASIS, DayCountBasis.ACT_ACT)
 
-    def _calculate_ytm(self, flows: List[CashFlow], dirty_price: float, calc_date: date, mat_date: Optional[date], year_basis: int) -> Optional[float]:
+    def _calculate_ytm(self, flows: List[CashFlow], dirty_price: float, calc_date: date, mat_date: Optional[date], year_basis: int, day_count: DayCountBasis) -> Optional[float]:
         """Вспомогательный метод для выбора формулы и расчёта доходности."""
         if not flows or dirty_price <= 0:
             return None
             
-        # Обновляем базис в солвере перед расчетом
+        # Обновляем базис и метод подсчета дней в солвере перед расчетом
         self.solver.basis = year_basis
+        self.solver.day_count = day_count
         
         next_coupon_date = flows[0].date
         if is_last_period(calc_date, next_coupon_date, mat_date):
@@ -120,25 +121,28 @@ class BondYieldCalculator:
             effective_nominal = nominal if nominal is not None else m_data.facevalue
             year_basis = m_data.yearbasis or config.DEFAULT_YEAR_BASIS
             
+            # Определяем метод подсчета дней (если 360 - скорее всего 30/360)
+            day_count = DayCountBasis.THIRTY_360 if year_basis == 360 else DayCountBasis.ACT_ACT
+            
             # Основная доходность (по цене закрытия или переданной цене)
             current_price = price if price is not None else m_data.price
             ytm = None
             dirty_price = 0.0
             if current_price:
                 dirty_price = (current_price * effective_nominal / 100.0) + (m_data.accruedint or 0.0)
-                ytm = self._calculate_ytm(flows, dirty_price, calc_date, m_data.matdate, year_basis)
+                ytm = self._calculate_ytm(flows, dirty_price, calc_date, m_data.matdate, year_basis, day_count)
 
             # Доходность по BID (покупка)
             ytm_bid = None
             if m_data.bid:
                 dirty_bid = (m_data.bid * effective_nominal / 100.0) + (m_data.accruedint or 0.0)
-                ytm_bid = self._calculate_ytm(flows, dirty_bid, calc_date, m_data.matdate, year_basis)
+                ytm_bid = self._calculate_ytm(flows, dirty_bid, calc_date, m_data.matdate, year_basis, day_count)
 
             # Доходность по OFFER (продажа)
             ytm_offer = None
             if m_data.offer:
                 dirty_offer = (m_data.offer * effective_nominal / 100.0) + (m_data.accruedint or 0.0)
-                ytm_offer = self._calculate_ytm(flows, dirty_offer, calc_date, m_data.matdate, year_basis)
+                ytm_offer = self._calculate_ytm(flows, dirty_offer, calc_date, m_data.matdate, year_basis, day_count)
 
             # Если цена не задана и нет рыночной цены, но есть bid/offer
             if not current_price:
@@ -158,6 +162,7 @@ class BondYieldCalculator:
                 accrued_interest=m_data.accruedint or 0.0,
                 cashflows=flows,
                 year_basis=year_basis,
+                day_count_method=day_count.value,
                 coupon_rate_calculated=m_data.couponpercent,
                 warning=warning
             )

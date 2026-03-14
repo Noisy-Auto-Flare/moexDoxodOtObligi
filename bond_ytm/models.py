@@ -97,6 +97,7 @@ class CalculationResult(BaseModel):
     accrued_interest: float
     cashflows: List[CashFlow] = []
     year_basis: Optional[int] = None
+    day_count_method: Optional[str] = None
     coupon_rate_calculated: Optional[float] = None
     warning: Optional[str] = None
     error_reason: Optional[str] = None

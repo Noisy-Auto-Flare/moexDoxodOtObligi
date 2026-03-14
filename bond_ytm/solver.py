@@ -5,28 +5,27 @@ from typing import List, Optional, Callable
 import structlog
 from .models import CashFlow
 from .config import config
-from .utils import date_diff_days
+from .utils import date_diff_days, DayCountBasis
 
 logger = structlog.get_logger(__name__)
 
 class YTMSolver:
     """Математический движок для расчёта доходности к погашению."""
 
-    def __init__(self, basis: int = 365):
+    def __init__(self, basis: int = 365, day_count: DayCountBasis = DayCountBasis.ACT_ACT):
         self.basis = basis
+        self.day_count = day_count
 
     def _npv(self, y: float, flows: List[CashFlow], calc_date: date) -> float:
         """
         Расчёт NPV (Net Present Value) для заданной доходности y.
-        y - доходность в процентах годовых.
         """
         total_pv = 0.0
         y_val = y / 100.0
         
         for f in flows:
-            t_i = date_diff_days(f.date, calc_date)
-            # Формула 12: PV = C_i / (1 + Y/100)^(t_i / YearBasis)
-            # t_i - количество дней до выплаты
+            t_i = date_diff_days(f.date, calc_date, self.day_count)
+            # Формула 12
             total_pv += f.amount / ((1 + y_val) ** (t_i / self.basis))
             
         return total_pv
@@ -59,20 +58,19 @@ class YTMSolver:
     def solve_simple(self, target_price: float, flows: List[CashFlow], calc_date: date) -> Optional[float]:
         """
         Расчёт по формуле простой доходности (для последнего периода).
-        Y = ((P_future / P_current) - 1) * (Basis / t) * 100
+        Y = ((P_future / P_current) - 1) * (Basis / t) * 100. Formula 18.
         """
         if not flows:
             return None
             
-        # Для последнего периода обычно один поток (купон + номинал)
-        # Суммируем все потоки (если их несколько на одну дату)
         total_future_amount = sum(f.amount for f in flows)
-        t = date_diff_days(flows[-1].date, calc_date)
+        t = date_diff_days(flows[-1].date, calc_date, self.day_count)
         
         if t <= 0:
             return 0.0
             
         try:
+            # Формула 18 использует Basis (обычно 365 или YearBasis)
             y = ((total_future_amount / target_price) - 1) * (self.basis / t) * 100
             return round(max(y, config.MIN_YIELD), 4)
         except ZeroDivisionError:
